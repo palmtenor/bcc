@@ -9,7 +9,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License")
 # Copyright (C) 2016 Sasha Goldshtein.
 
-from bcc import BPF, Tracepoint, Perf, ProcUtils, USDT
+from bcc import BPF, Tracepoint, Perf, USDT
 from time import sleep, strftime
 import argparse
 import re
@@ -149,6 +149,35 @@ class Probe(object):
                 else:
                         self.library = parts[1]
                         self.function = parts[2]
+
+        @classmethod
+        def _find_exe(cls, bin_path):
+                """
+                _find_exe(bin_path)
+
+                Traverses the PATH environment variable, looking for the first
+                directory that contains an executable file named bin_path, and
+                returns the full path to that file, or None if no such file
+                can be found. This is meant to replace invocations of the
+                "which" shell utility, which doesn't have portable semantics
+                for skipping aliases.
+                """
+                # Source: http://stackoverflow.com/a/377028
+                def is_exe(fpath):
+                        return os.path.isfile(fpath) and \
+                               os.access(fpath, os.X_OK)
+
+                fpath, fname = os.path.split(bin_path)
+                if fpath:
+                        if is_exe(bin_path):
+                                return bin_path
+                else:
+                        for path in os.environ["PATH"].split(os.pathsep):
+                                path = path.strip('"')
+                                exe_file = os.path.join(path, bin_path)
+                                if is_exe(exe_file):
+                                        return exe_file
+                return None
 
         def _enable_usdt_probe(self):
                 if self.usdt.need_enable():
@@ -416,7 +445,7 @@ BPF_PERF_OUTPUT(%s);
                 libpath = BPF.find_library(self.library)
                 if libpath is None:
                         # This might be an executable (e.g. 'bash')
-                        libpath = ProcUtils.which(self.library)
+                        libpath = Probe._find_exe(self.library)
                 if libpath is None or len(libpath) == 0:
                         self._bail("unable to find library %s" % self.library)
 

@@ -175,6 +175,36 @@ u64 __time = bpf_ktime_get_ns();
                         self._bail("no exprs specified")
                 self.exprs = exprs.split(',')
 
+        @classmethod
+        def _find_exe(cls, bin_path):
+                """
+                _find_exe(bin_path)
+
+                Traverses the PATH environment variable, looking for the first
+                directory that contains an executable file named bin_path, and
+                returns the full path to that file, or None if no such file
+                can be found. This is meant to replace invocations of the
+                "which" shell utility, which doesn't have portable semantics
+                for skipping aliases.
+                """
+                # Source: http://stackoverflow.com/a/377028
+                def is_exe(fpath):
+                        return os.path.isfile(fpath) and \
+                               os.access(fpath, os.X_OK)
+
+                fpath, fname = os.path.split(bin_path)
+                if fpath:
+                        if is_exe(bin_path):
+                                return bin_path
+                else:
+                        for path in os.environ["PATH"].split(os.pathsep):
+                                path = path.strip('"')
+                                exe_file = os.path.join(path, bin_path)
+                                if is_exe(exe_file):
+                                        return exe_file
+                return None
+
+
         def __init__(self, bpf, type, specifier):
                 self.pid = bpf.args.pid
                 self.raw_spec = specifier
@@ -371,7 +401,7 @@ int PROBENAME(struct pt_regs *ctx SIGNATURE)
         def _attach_u(self):
                 libpath = BPF.find_library(self.library)
                 if libpath is None:
-                        libpath = ProcUtils.which(self.library)
+                        libpath = Probe._find_exe(self.library)
                 if libpath is None or len(libpath) == 0:
                         self._bail("unable to find library %s" % self.library)
 

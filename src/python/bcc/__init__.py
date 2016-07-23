@@ -451,7 +451,8 @@ class BPF(object):
 
     @staticmethod
     def find_library(libname):
-        return lib.bcc_procutils_which_so(libname.encode("ascii")).decode()
+        res = lib.bcc_procutils_which_so(libname.encode("ascii"))
+        return res if res is None else res.decode()
 
     def attach_tracepoint(self, tp="", fn_name="", pid=-1, cpu=0, group_fd=-1):
         """attach_tracepoint(tp="", fn_name="", pid=-1, cpu=0, group_fd=-1)
